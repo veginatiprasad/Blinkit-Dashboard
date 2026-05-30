@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BlinkIT Grocery Premium Dashboard | Analytics ❤️</title>
+    
+    <!-- Google Fonts: Outfit & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- ApexCharts CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    
+    <!-- PapaParse for CSV parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <!-- html2pdf for exporting PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <!-- Canvas Confetti for fun celebrations -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Full-screen fallback loader for local raw file loading -->
+    <div id="file-uploader-overlay" class="uploader-overlay hidden">
+        <div class="uploader-card glass">
+            <div class="heart-pulse-container">
+                <i class="fa-solid fa-heart pulse-heart"></i>
+            </div>
+            <h2>Welcome to BlinkIT Dashboard</h2>
+            <p>Since you are running this file directly in your browser without a local server, security policies prevent auto-loading the CSV.</p>
+            <div id="drop-zone" class="drop-zone">
+                <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                <p>Drag & Drop your <strong>BlinkIT Grocery Data.csv</strong> here</p>
+                <span>or</span>
+                <label for="csv-file-input" class="btn btn-primary">Browse File</label>
+                <input type="file" id="csv-file-input" accept=".csv" style="display: none;">
+            </div>
+            <div id="upload-status" class="upload-status"></div>
+        </div>
+    </div>
+
+    <!-- Application Dashboard Layout -->
+    <div class="app-container">
+        <!-- Sidebar Navigation & Filters -->
+        <aside class="sidebar glass" id="sidebar-print-exclude">
+            <div class="brand">
+                <div class="logo-box">
+                    <i class="fa-solid fa-heart logo-heart"></i>
+                </div>
+                <div>
+                    <h1>BlinkIT BI</h1>
+                    <span class="sub-brand">Retail Analytics</span>
+                </div>
+            </div>
+            
+            <div class="sidebar-divider"></div>
+            
+            <!-- Global Reset Button -->
+            <button class="btn btn-reset btn-block" id="btn-reset-filters">
+                <i class="fa-solid fa-rotate-left"></i> Reset All Slicers
+            </button>
+            
+            <!-- Slicer Section: Search -->
+            <div class="filter-section">
+                <label class="filter-label"><i class="fa-solid fa-magnifying-glass"></i> Search Identifier</label>
+                <div class="search-input-wrapper">
+                    <input type="text" id="filter-search" placeholder="Search item/outlet id...">
+                </div>
+            </div>
+            
+            <!-- Slicer Section: Fat Content -->
+            <div class="filter-section">
+                <label class="filter-label"><i class="fa-solid fa-shield-halved"></i> Fat Content</label>
+                <div class="pill-group" id="filter-fat">
+                    <button class="pill active" data-value="All">All</button>
+                    <button class="pill" data-value="Low Fat">Low Fat</button>
+                    <button class="pill" data-value="Regular">Regular</button>
+                </div>
+            </div>
+            
+            <!-- Slicer Section: Location Tier -->
+            <div class="filter-section">
+                <label class="filter-label"><i class="fa-solid fa-map-location-dot"></i> Location Type</label>
+                <div class="pill-group" id="filter-location">
+                    <button class="pill active" data-value="All">All</button>
+                    <button class="pill" data-value="Tier 1">Tier 1</button>
+                    <button class="pill" data-value="Tier 2">Tier 2</button>
+                    <button class="pill" data-value="Tier 3">Tier 3</button>
+                </div>
+            </div>
+
+            <!-- Slicer Section: Outlet Size -->
+            <div class="filter-section">
+                <label class="filter-label"><i class="fa-solid fa-expand"></i> Outlet Size</label>
+                <div class="pill-group" id="filter-size">
+                    <button class="pill active" data-value="All">All</button>
+                    <button class="pill" data-value="Small">Small</button>
+                    <button class="pill" data-value="Medium">Medium</button>
+                    <button class="pill" data-value="High">High</button>
+                    <button class="pill" data-value="Not Specified">Unspecified</button>
+                </div>
+            </div>
+
+            <!-- Slicer Section: Item Type -->
+            <div class="filter-section">
+                <label class="filter-label"><i class="fa-solid fa-tags"></i> Product Type</label>
+                <select id="filter-item-type" class="form-select">
+                    <option value="All">All Product Types (16)</option>
+                </select>
+            </div>
+
+            <!-- Heart Utility Card -->
+            <div class="favorite-utility-card glass">
+                <div class="fav-header">
+                    <h4>My Hearted Outlets</h4>
+                    <span class="badge" id="fav-count">0</span>
+                </div>
+                <p>Click the ❤️ in details or KPI to filter specifically by favorited stores.</p>
+                <button class="btn btn-heart-accent btn-block" id="btn-toggle-favorites-only">
+                    <i class="fa-solid fa-heart"></i> Show Hearted Only
+                </button>
+            </div>
+
+            <!-- Export / Actions Section -->
+            <div class="sidebar-footer">
+                <h3>Export Options</h3>
+                <button class="btn btn-primary btn-block" id="btn-download-pdf">
+                    <i class="fa-solid fa-file-pdf"></i> Download PDF Report
+                </button>
+                <button class="btn btn-secondary btn-block" id="btn-download-csv">
+                    <i class="fa-solid fa-file-csv"></i> Download Filtered CSV
+                </button>
+                <div class="creator-stamp">
+                    <span>PowerBI Web Developer Mode</span>
+                    <i class="fa-solid fa-circle-check text-success"></i>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Dashboard View -->
+        <main class="main-content" id="dashboard-print-root">
+            <!-- Top Dashboard Header Bar -->
+            <header class="dashboard-header">
+                <div class="header-left">
+                    <h2>BlinkIT Grocery Executive Dashboard</h2>
+                    <p class="header-subtitle">Performance Indicators & Slicer Analytics | <span id="current-date-span">May 2026</span></p>
+                </div>
+                <div class="header-right" id="header-controls-print-exclude">
+                    <div class="theme-toggle" id="btn-theme-toggle" title="Toggle Light/Dark Theme">
+                        <i class="fa-solid fa-moon dark-icon"></i>
+                        <i class="fa-solid fa-sun light-icon"></i>
+                    </div>
+                    <div class="heart-pulse-box" id="heart-pulse-box" title="Click for a quick boost of coding love!">
+                        <i class="fa-solid fa-heart header-heart"></i>
+                    </div>
+                </div>
+            </header>
+
+            <!-- KPI Summary Cards Panel -->
+            <section class="kpi-grid">
+                <!-- KPI 1: Total Revenue -->
+                <div class="kpi-card glass primary-kpi">
+                    <div class="kpi-icon-box bg-purple">
+                        <i class="fa-solid fa-sack-dollar"></i>
+                    </div>
+                    <div class="kpi-content">
+                        <h3>Total Sales Revenue</h3>
+                        <div class="kpi-value" id="kpi-total-sales">₹0.00</div>
+                        <p class="kpi-trend trend-up"><i class="fa-solid fa-arrow-trend-up"></i> Top Selling Channels</p>
+                    </div>
+                    <div class="card-glow-bg"></div>
+                </div>
+
+                <!-- KPI 2: Customer Satisfaction (Heart Rating) -->
+                <div class="kpi-card glass success-kpi" id="kpi-card-rating">
+                    <div class="kpi-icon-box bg-pink">
+                        <i class="fa-solid fa-heart"></i>
+                    </div>
+                    <div class="kpi-content">
+                        <h3>Customer Trust Rating</h3>
+                        <div class="kpi-value-container">
+                            <div class="kpi-value" id="kpi-avg-rating">0.00</div>
+                            <div class="heart-meter" id="heart-stars-rating">
+                                <!-- Dynamic Hearts injected here -->
+                            </div>
+                        </div>
+                        <p class="kpi-trend text-pink"><i class="fa-solid fa-heart-pulse"></i> Satisfaction Score</p>
+                    </div>
+                    <div class="card-glow-bg"></div>
+                </div>
+
+                <!-- KPI 3: Total Transactions -->
+                <div class="kpi-card glass info-kpi">
+                    <div class="kpi-icon-box bg-blue">
+                        <i class="fa-solid fa-cart-shopping"></i>
+                    </div>
+                    <div class="kpi-content">
+                        <h3>Total Items Logged</h3>
+                        <div class="kpi-value" id="kpi-total-items">0</div>
+                        <p class="kpi-trend text-blue"><i class="fa-solid fa-truck-ramp-box"></i> Active Logistics</p>
+                    </div>
+                    <div class="card-glow-bg"></div>
+                </div>
+
+                <!-- KPI 4: Visibility Factor -->
+                <div class="kpi-card glass warning-kpi">
+                    <div class="kpi-icon-box bg-orange">
+                        <i class="fa-solid fa-eye"></i>
+                    </div>
+                    <div class="kpi-content">
+                        <h3>Average Visibility</h3>
+                        <div class="kpi-value" id="kpi-avg-visibility">0.00%</div>
+                        <p class="kpi-trend text-orange"><i class="fa-solid fa-magnifying-glass-chart"></i> Shelf Coverage</p>
+                    </div>
+                    <div class="card-glow-bg"></div>
+                </div>
+            </section>
+
+            <!-- Interactive Visualizations Grid -->
+            <section class="charts-grid">
+                <!-- Row 1 Chart 1: Sales Growth Timeline (Apex Area Chart) -->
+                <div class="chart-card glass span-2">
+                    <div class="chart-header">
+                        <h4><i class="fa-solid fa-chart-line text-purple"></i> Sales Trend & Store Launch Timeline</h4>
+                        <div class="chart-tooltip-badge" title="Sales grouped by Outlet Establishment Year">Annual Trend</div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <div id="chart-sales-timeline"></div>
+                    </div>
+                </div>
+
+                <!-- Row 2 Chart 2: Product Categories Performance -->
+                <div class="chart-card glass">
+                    <div class="chart-header">
+                        <h4><i class="fa-solid fa-chart-bar text-pink"></i> Top Selling Product Categories (₹)</h4>
+                        <span class="chart-info-span">Sales Ranked</span>
+                    </div>
+                    <div class="chart-wrapper">
+                        <div id="chart-product-performance"></div>
+                    </div>
+                </div>
+
+                <!-- Row 2 Chart 3: Fat Content Sales Proportion -->
+                <div class="chart-card glass">
+                    <div class="chart-header">
+                        <h4><i class="fa-solid fa-chart-pie text-blue"></i> Sales Share by Fat Content</h4>
+                        <span class="chart-info-span">Market Share</span>
+                    </div>
+                    <div class="chart-wrapper flex-center">
+                        <div id="chart-fat-distribution"></div>
+                    </div>
+                </div>
+
+                <!-- Row 3 Chart 4: Location Type & Outlet Size Cross-Analysis -->
+                <div class="chart-card glass span-2">
+                    <div class="chart-header">
+                        <h4><i class="fa-solid fa-building-columns text-orange"></i> Revenue Contribution by Outlet Location Tier & Size</h4>
+                        <span class="chart-info-span">Multi-dimensional Analysis</span>
+                    </div>
+                    <div class="chart-wrapper">
+                        <div id="chart-outlet-dimension"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Raw Data Details & Table Panel -->
+            <section class="details-section glass">
+                <div class="details-header">
+                    <div class="title-area">
+                        <h4><i class="fa-solid fa-table-list text-purple"></i> Detailed Transaction Ledger</h4>
+                        <p class="section-subtitle">Real-time table synced with active slicers above (<span id="table-row-count">0</span> items)</p>
+                    </div>
+                    <div class="table-controls" id="table-controls-print-exclude">
+                        <div class="table-search">
+                            <input type="text" id="table-search-input" placeholder="Search rows...">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                        </div>
+                        <select id="table-page-size" class="form-select select-sm">
+                            <option value="10">10 Rows</option>
+                            <option value="25">25 Rows</option>
+                            <option value="50">50 Rows</option>
+                            <option value="100">100 Rows</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Data Table Wrap -->
+                <div class="table-overflow-wrapper">
+                    <table class="data-table" id="transaction-table">
+                        <thead>
+                            <tr>
+                                <th>Item ID</th>
+                                <th>Item Type</th>
+                                <th>Fat Content</th>
+                                <th>Store ID</th>
+                                <th>Store Size</th>
+                                <th>Location Type</th>
+                                <th>Rating</th>
+                                <th class="text-right">Total Sales (₹)</th>
+                                <th class="text-center" id="th-fav-exclude">Heart</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transaction-table-body">
+                            <!-- Injected by app.js -->
+                            <tr>
+                                <td colspan="9" class="text-center">
+                                    <div class="loading-spinner">
+                                        <i class="fa-solid fa-spinner fa-spin"></i> Loading grocery data...
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Table Pagination -->
+                <div class="table-pagination" id="pagination-print-exclude">
+                    <div class="pagination-info">
+                        Showing <span id="page-start-idx">0</span> - <span id="page-end-idx">0</span> of <span id="page-total-count">0</span> records
+                    </div>
+                    <div class="pagination-buttons">
+                        <button class="btn btn-outline btn-sm" id="btn-page-prev" disabled><i class="fa-solid fa-chevron-left"></i> Prev</button>
+                        <div class="page-numbers-container" id="page-numbers"></div>
+                        <button class="btn btn-outline btn-sm" id="btn-page-next" disabled>Next <i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
